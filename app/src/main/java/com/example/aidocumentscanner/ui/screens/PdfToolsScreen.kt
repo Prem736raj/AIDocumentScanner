@@ -47,6 +47,8 @@ import java.io.File
 
 private const val TEMP_DIR_ERROR_MESSAGE = "Cannot create temporary directory for PDF processing"
 private const val PDF_READ_ERROR_MESSAGE = "Cannot open PDF file. It may be corrupted or inaccessible."
+private fun externalPdfReadErrorMessage(fileName: String) =
+    "Cannot open $fileName. The file may be corrupted or inaccessible."
 
 // Data class to represent external PDF files from file manager
 data class ExternalPdfFile(
@@ -512,7 +514,7 @@ fun PdfToolsScreen(
                                                     val tempFile = File(tempDir, "ext_${System.currentTimeMillis()}_${external.name}")
                                                     val inputStream = context.contentResolver.openInputStream(external.uri)
                                                     if (inputStream == null) {
-                                                        Toast.makeText(context, "Cannot open ${external.name}. The file may be corrupted or inaccessible.", Toast.LENGTH_LONG).show()
+                                                        Toast.makeText(context, externalPdfReadErrorMessage(external.name), Toast.LENGTH_LONG).show()
                                                         return@forEach
                                                     }
                                                     inputStream.use { input ->
