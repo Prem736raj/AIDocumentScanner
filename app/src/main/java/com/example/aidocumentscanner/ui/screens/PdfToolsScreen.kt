@@ -294,14 +294,14 @@ fun PdfToolsScreen(
                                         selectedExternalPdf?.let { external ->
                                             val tempDir = File(context.cacheDir, "pdf")
                                             if (!tempDir.exists() && !tempDir.mkdirs()) {
-                                                Toast.makeText(context, "Failed to access temporary storage", Toast.LENGTH_LONG).show()
+                                                Toast.makeText(context, "Cannot create temporary directory for PDF processing", Toast.LENGTH_LONG).show()
                                                 isProcessing = false
                                                 return@launch
                                             }
                                             val tempFile = File(tempDir, "temp_${System.currentTimeMillis()}.pdf")
                                             val inputStream = context.contentResolver.openInputStream(external.uri)
                                             if (inputStream == null) {
-                                                Toast.makeText(context, "Failed to read selected PDF", Toast.LENGTH_LONG).show()
+                                                Toast.makeText(context, "Cannot open PDF file. It may be corrupted or inaccessible.", Toast.LENGTH_LONG).show()
                                                 isProcessing = false
                                                 return@launch
                                             }
@@ -503,13 +503,13 @@ fun PdfToolsScreen(
                                                 try {
                                                     val tempDir = File(context.cacheDir, "pdf")
                                                     if (!tempDir.exists() && !tempDir.mkdirs()) {
-                                                        Toast.makeText(context, "Failed to access temporary storage", Toast.LENGTH_LONG).show()
+                                                        Toast.makeText(context, "Cannot create temporary directory for PDF processing", Toast.LENGTH_LONG).show()
                                                         return@forEach
                                                     }
                                                     val tempFile = File(tempDir, "ext_${System.currentTimeMillis()}_${external.name}")
                                                     val inputStream = context.contentResolver.openInputStream(external.uri)
                                                     if (inputStream == null) {
-                                                        Toast.makeText(context, "Failed to read ${external.name}", Toast.LENGTH_LONG).show()
+                                                        Toast.makeText(context, "Cannot open ${external.name}. The file may be corrupted or inaccessible.", Toast.LENGTH_LONG).show()
                                                         return@forEach
                                                     }
                                                     inputStream.use { input ->
