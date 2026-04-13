@@ -200,13 +200,13 @@ fun PdfOptimizerScreen(
                     ) {
                         Column {
                             Text(
-                                selectedDocument!!.name,
+                                selectedDocument?.name.orEmpty(),
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
                             Text(
-                                "Original: ${PdfGenerator.formatFileSize(selectedDocument!!.size)}",
+                                "Original: ${PdfGenerator.formatFileSize(selectedDocument?.size ?: 0L)}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -289,22 +289,23 @@ fun PdfOptimizerScreen(
                 // Optimize button
                 Button(
                     onClick = {
+                        val documentToOptimize = selectedDocument ?: return@Button
                         isProcessing = true
                         scope.launch {
                             val result = withContext(Dispatchers.IO) {
                                 PdfEditor.optimizePdf(
                                     context,
-                                    selectedDocument!!.pdfPath,
+                                    documentToOptimize.pdfPath,
                                     selectedQuality.jpegQuality
                                 )
                             }
                             
                             result.onSuccess { newPath ->
                                 val newDoc = Document(
-                                    name = "${selectedDocument!!.name}_optimized",
+                                    name = "${documentToOptimize.name}_optimized",
                                     pdfPath = newPath,
-                                    thumbnailPath = selectedDocument!!.thumbnailPath,
-                                    pageCount = selectedDocument!!.pageCount,
+                                    thumbnailPath = documentToOptimize.thumbnailPath,
+                                    pageCount = documentToOptimize.pageCount,
                                     size = File(newPath).length()
                                 )
                                 val docId = repository.insertDocument(newDoc)

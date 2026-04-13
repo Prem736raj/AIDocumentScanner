@@ -189,12 +189,12 @@ fun PdfToolsScreen(
                 title = { 
                     Column {
                         Text(
-                            if (selectedTool != null) selectedTool!!.label else "PDF Tools",
+                            selectedTool?.label ?: "PDF Tools",
                             fontWeight = FontWeight.Bold
                         )
                         if (selectedTool != null) {
                             Text(
-                                selectedTool!!.description,
+                                selectedTool?.description.orEmpty(),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -599,6 +599,7 @@ fun PdfToolsScreen(
                     confirmButton = {
                         Button(
                             onClick = {
+                                val currentDocument = selectedDocument ?: return@Button
                                 if (watermarkText.isNotBlank()) {
                                     isProcessing = true
                                     processingMessage = "Adding watermark..."
@@ -606,15 +607,15 @@ fun PdfToolsScreen(
                                     
                                     scope.launch {
                                         val result = withContext(Dispatchers.IO) {
-                                            PdfEditor.addWatermark(context, selectedDocument!!.pdfPath, watermarkText)
+                                            PdfEditor.addWatermark(context, currentDocument.pdfPath, watermarkText)
                                         }
                                         
                                         result.onSuccess { newPath ->
                                             val newDoc = Document(
-                                                name = "${selectedDocument!!.name}_watermarked",
+                                                name = "${currentDocument.name}_watermarked",
                                                 pdfPath = newPath,
-                                                thumbnailPath = selectedDocument!!.thumbnailPath,
-                                                pageCount = selectedDocument!!.pageCount,
+                                                thumbnailPath = currentDocument.thumbnailPath,
+                                                pageCount = currentDocument.pageCount,
                                                 size = PdfGenerator.getFileSize(newPath)
                                             )
                                             repository.insertDocument(newDoc)
@@ -673,6 +674,7 @@ fun PdfToolsScreen(
                     confirmButton = {
                         Button(
                             onClick = {
+                                val currentDocument = selectedDocument ?: return@Button
                                 if (passwordText.isNotBlank()) {
                                     isProcessing = true
                                     processingMessage = "Encrypting PDF..."
@@ -680,15 +682,15 @@ fun PdfToolsScreen(
                                     
                                     scope.launch {
                                         val result = withContext(Dispatchers.IO) {
-                                            PdfEditor.passwordProtect(context, selectedDocument!!.pdfPath, passwordText)
+                                            PdfEditor.passwordProtect(context, currentDocument.pdfPath, passwordText)
                                         }
                                         
                                         result.onSuccess { newPath ->
                                             val newDoc = Document(
-                                                name = "${selectedDocument!!.name}_protected",
+                                                name = "${currentDocument.name}_protected",
                                                 pdfPath = newPath,
-                                                thumbnailPath = selectedDocument!!.thumbnailPath,
-                                                pageCount = selectedDocument!!.pageCount,
+                                                thumbnailPath = currentDocument.thumbnailPath,
+                                                pageCount = currentDocument.pageCount,
                                                 size = PdfGenerator.getFileSize(newPath)
                                             )
                                             repository.insertDocument(newDoc)

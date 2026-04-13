@@ -6,7 +6,6 @@ import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -23,6 +22,8 @@ import org.opencv.android.OpenCVLoader
 
 class MainActivity : ComponentActivity() {
     
+    private var externalPdfUriState by mutableStateOf<Uri?>(null)
+
     companion object {
         private const val TAG = "AIDocumentScanner"
         private const val PREFS_NAME = "theme_prefs"
@@ -42,7 +43,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         
         // Check if app was opened with a PDF file
-        val pdfUri = handlePdfIntent(intent)
+        externalPdfUriState = handlePdfIntent(intent)
         
         // Load saved theme preference
         val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -50,8 +51,6 @@ class MainActivity : ComponentActivity() {
         
         setContent {
             var themeMode by remember { mutableStateOf(ThemeMode.valueOf(savedThemeMode)) }
-            var externalPdfUri by remember { mutableStateOf(pdfUri) }
-            
             AIDocumentScannerTheme(themeMode = themeMode) {
                 val navController = rememberNavController()
                 
@@ -75,8 +74,8 @@ class MainActivity : ComponentActivity() {
                         // Save theme preference
                         prefs.edit().putString(KEY_THEME_MODE, newMode.name).apply()
                     },
-                    externalPdfUri = externalPdfUri,
-                    onExternalPdfHandled = { externalPdfUri = null }
+                    externalPdfUri = externalPdfUriState,
+                    onExternalPdfHandled = { externalPdfUriState = null }
                 )
             }
         }
@@ -84,11 +83,11 @@ class MainActivity : ComponentActivity() {
     
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
         // Handle new PDF intent when app is already running
         handlePdfIntent(intent)?.let { uri ->
             Log.d(TAG, "Received new PDF intent: $uri")
-            // Open the PDF with external viewer
-            openPdfWithExternalViewer(uri)
+            externalPdfUriState = uri
         }
     }
     
@@ -107,15 +106,4 @@ class MainActivity : ComponentActivity() {
         return null
     }
     
-    private fun openPdfWithExternalViewer(uri: Uri) {
-        try {
-            val intent = Intent(Intent.ACTION_VIEW).apply {
-                setDataAndType(uri, "application/pdf")
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-            startActivity(Intent.createChooser(intent, "Open PDF"))
-        } catch (e: Exception) {
-            Toast.makeText(this, "No PDF viewer found", Toast.LENGTH_SHORT).show()
-        }
-    }
 }

@@ -166,7 +166,7 @@ fun PdfViewerScreen(
                         Spacer(modifier = Modifier.height(16.dp))
                         Text("Could not render PDF", style = MaterialTheme.typography.titleMedium)
                         Spacer(modifier = Modifier.height(16.dp))
-                        OutlinedButton(onClick = { openWithExternalApp(context, document!!) }) {
+                        OutlinedButton(onClick = { document?.let { openWithExternalApp(context, it) } }) {
                             Icon(Icons.Default.OpenInNew, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Open with External Viewer")
