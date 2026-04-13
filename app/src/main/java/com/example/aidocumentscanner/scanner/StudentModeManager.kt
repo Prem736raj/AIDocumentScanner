@@ -8,7 +8,6 @@ import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.runBlocking
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -58,10 +57,8 @@ object StudentModeManager {
     /**
      * Get current settings synchronously
      */
-    fun getSettingsSync(context: Context): StudentModeSettings {
-        return runBlocking {
-            getSettings(context).first()
-        }
+    suspend fun getSettingsSync(context: Context): StudentModeSettings {
+        return getSettings(context).first()
     }
     
     /**

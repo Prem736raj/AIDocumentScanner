@@ -2,13 +2,10 @@ package com.example.aidocumentscanner.ui.screens
 
 import android.Manifest
 import android.content.Context
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
-import android.os.Environment
 import android.provider.MediaStore
-import android.provider.Settings
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -30,7 +27,6 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -69,17 +65,6 @@ fun DevicePdfBrowserScreen(
     ) { permissions ->
         Log.d(TAG, "Permission result: $permissions")
         hasPermission = checkStoragePermission(context)
-        if (hasPermission) {
-            refreshTrigger++
-        }
-    }
-    
-    // Settings launcher for MANAGE_EXTERNAL_STORAGE
-    val settingsLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) {
-        hasPermission = checkStoragePermission(context)
-        Log.d(TAG, "Settings result, permission: $hasPermission")
         if (hasPermission) {
             refreshTrigger++
         }
@@ -190,19 +175,10 @@ fun DevicePdfBrowserScreen(
                         
                         Button(
                             onClick = {
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                                    // Android 11+ needs special all files access
-                                    try {
-                                        val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
-                                            data = Uri.parse("package:${context.packageName}")
-                                        }
-                                        settingsLauncher.launch(intent)
-                                    } catch (e: Exception) {
-                                        val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
-                                        settingsLauncher.launch(intent)
-                                    }
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    hasPermission = true
+                                    refreshTrigger++
                                 } else {
-                                    // Legacy permission request
                                     permissionLauncher.launch(
                                         arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
                                     )
@@ -268,11 +244,9 @@ fun DevicePdfBrowserScreen(
  * Check if storage permission is granted
  */
 private fun checkStoragePermission(context: Context): Boolean {
-    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-        // Android 11+ - check MANAGE_EXTERNAL_STORAGE
-        Environment.isExternalStorageManager()
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        true
     } else {
-        // Below Android 11 - check READ_EXTERNAL_STORAGE
         ContextCompat.checkSelfPermission(
             context, 
             Manifest.permission.READ_EXTERNAL_STORAGE
@@ -342,14 +316,13 @@ private fun DevicePdfCard(
 private fun getAllPdfsFromDevice(context: Context): List<DevicePdfFile> {
     val pdfList = mutableListOf<DevicePdfFile>()
     
-    // Method 1: MediaStore query
+    // MediaStore query
     try {
         val projection = arrayOf(
             MediaStore.Files.FileColumns._ID,
             MediaStore.Files.FileColumns.DISPLAY_NAME,
             MediaStore.Files.FileColumns.SIZE,
-            MediaStore.Files.FileColumns.DATE_MODIFIED,
-            MediaStore.Files.FileColumns.DATA
+            MediaStore.Files.FileColumns.DATE_MODIFIED
         )
         
         val selection = "${MediaStore.Files.FileColumns.MIME_TYPE} = ? OR ${MediaStore.Files.FileColumns.DISPLAY_NAME} LIKE ?"
@@ -367,7 +340,6 @@ private fun getAllPdfsFromDevice(context: Context): List<DevicePdfFile> {
             val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DISPLAY_NAME)
             val sizeColumn = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.SIZE)
             val dateColumn = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DATE_MODIFIED)
-            val dataColumn = cursor.getColumnIndex(MediaStore.Files.FileColumns.DATA)
             
             Log.d(TAG, "MediaStore returned ${cursor.count} results")
             
@@ -376,72 +348,21 @@ private fun getAllPdfsFromDevice(context: Context): List<DevicePdfFile> {
                 val name = cursor.getString(nameColumn) ?: continue
                 val size = cursor.getLong(sizeColumn)
                 val dateModified = cursor.getLong(dateColumn) * 1000
-                val path = if (dataColumn >= 0) cursor.getString(dataColumn) ?: "" else ""
                 
                 if (name.endsWith(".pdf", ignoreCase = true)) {
                     val uri = android.content.ContentUris.withAppendedId(
                         MediaStore.Files.getContentUri("external"), id
                     )
-                    pdfList.add(DevicePdfFile(uri, path, name, size, dateModified))
+                    pdfList.add(DevicePdfFile(uri, "", name, size, dateModified))
                 }
             }
         }
     } catch (e: Exception) {
         Log.e(TAG, "MediaStore query error: ${e.message}")
     }
-    
-    // Method 2: Direct file scanning
-    val directories = listOf(
-        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
-        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS),
-        File(Environment.getExternalStorageDirectory(), "Download"),
-        File(Environment.getExternalStorageDirectory(), "Documents"),
-        File(Environment.getExternalStorageDirectory(), "WhatsApp/Media/WhatsApp Documents"),
-        File(Environment.getExternalStorageDirectory(), "Telegram/Telegram Documents"),
-        Environment.getExternalStorageDirectory()
-    )
-    
-    for (dir in directories) {
-        try {
-            if (dir.exists() && dir.isDirectory && dir.canRead()) {
-                Log.d(TAG, "Scanning: ${dir.absolutePath}")
-                scanDirectoryForPdfs(dir, pdfList, 0)
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Scan error for ${dir.absolutePath}: ${e.message}")
-        }
-    }
-    
+
     Log.d(TAG, "Total PDFs: ${pdfList.size}")
     return pdfList.distinctBy { it.name + it.size }.sortedByDescending { it.dateModified }
-}
-
-private fun scanDirectoryForPdfs(dir: File, pdfList: MutableList<DevicePdfFile>, depth: Int) {
-    if (depth > 4) return
-    
-    try {
-        dir.listFiles()?.forEach { file ->
-            when {
-                file.isDirectory && file.canRead() && !file.name.startsWith(".") -> {
-                    scanDirectoryForPdfs(file, pdfList, depth + 1)
-                }
-                file.isFile && file.extension.equals("pdf", ignoreCase = true) -> {
-                    val exists = pdfList.any { it.name == file.name && it.size == file.length() }
-                    if (!exists) {
-                        pdfList.add(DevicePdfFile(
-                            uri = Uri.fromFile(file),
-                            path = file.absolutePath,
-                            name = file.name,
-                            size = file.length(),
-                            dateModified = file.lastModified()
-                        ))
-                    }
-                }
-            }
-        }
-    } catch (e: SecurityException) {
-        Log.e(TAG, "Security error: ${e.message}")
-    }
 }
 
 private fun formatFileSize(size: Long): String {

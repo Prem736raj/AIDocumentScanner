@@ -417,7 +417,34 @@ fun PdfToolsScreen(
                                         PdfTool.ADD_WATERMARK -> showWatermarkDialog = true
                                         PdfTool.PASSWORD_PROTECT -> showPasswordDialog = true
                                         PdfTool.OPTIMIZE -> {
-                                            // Handle optimize
+                                            isProcessing = true
+                                            processingMessage = "Optimizing PDF..."
+                                            scope.launch {
+                                                val result = withContext(Dispatchers.IO) {
+                                                    PdfEditor.optimizePdf(context, doc.pdfPath, 60)
+                                                }
+
+                                                result.onSuccess { newPath ->
+                                                    val newDoc = Document(
+                                                        name = "${doc.name}_optimized",
+                                                        pdfPath = newPath,
+                                                        thumbnailPath = doc.thumbnailPath,
+                                                        pageCount = doc.pageCount,
+                                                        size = PdfGenerator.getFileSize(newPath)
+                                                    )
+                                                    val docId = repository.insertDocument(newDoc)
+                                                    Toast.makeText(context, "PDF optimized successfully!", Toast.LENGTH_SHORT).show()
+                                                    onMergeComplete(docId)
+                                                }
+
+                                                result.onFailure { error ->
+                                                    Toast.makeText(context, "Error: ${error.message}", Toast.LENGTH_LONG).show()
+                                                }
+
+                                                isProcessing = false
+                                                selectedDocument = null
+                                                selectedTool = null
+                                            }
                                         }
                                         else -> {}
                                     }

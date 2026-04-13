@@ -15,6 +15,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.aidocumentscanner.data.Document
+import com.example.aidocumentscanner.data.DocumentRepository
+import com.example.aidocumentscanner.pdf.PdfEditor
+import com.example.aidocumentscanner.pdf.PdfGenerator
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.example.aidocumentscanner.ui.components.InAppPdfViewer
 import java.io.File
 import java.io.FileOutputStream
@@ -31,6 +38,8 @@ fun ExternalPdfViewerScreen(
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
+    val repository = remember { DocumentRepository(context) }
+    val scope = rememberCoroutineScope()
     var pdfName by remember { mutableStateOf("PDF Document") }
     var pageCount by remember { mutableStateOf(0) }
     
@@ -99,23 +108,57 @@ fun ExternalPdfViewerScreen(
                     
                     // Import to app
                     IconButton(onClick = {
-                        try {
-                            val documentsDir = File(context.filesDir, "documents")
-                            if (!documentsDir.exists()) documentsDir.mkdirs()
-                            
-                            val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-                            val fileName = "Imported_${timestamp}.pdf"
-                            val outputFile = File(documentsDir, fileName)
-                            
-                            context.contentResolver.openInputStream(pdfUri)?.use { input ->
-                                FileOutputStream(outputFile).use { output ->
-                                    input.copyTo(output)
+                        scope.launch {
+                            try {
+                                val outputFile = withContext(Dispatchers.IO) {
+                                    val documentsDir = File(context.filesDir, "documents")
+                                    if (!documentsDir.exists()) documentsDir.mkdirs()
+
+                                    val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+                                    val fileName = "Imported_${timestamp}.pdf"
+                                    val file = File(documentsDir, fileName)
+
+                                    context.contentResolver.openInputStream(pdfUri)?.use { input ->
+                                        FileOutputStream(file).use { output ->
+                                            input.copyTo(output)
+                                        }
+                                    }
+
+                                    file
                                 }
+
+                                val importedPageCount = withContext(Dispatchers.IO) {
+                                    PdfEditor.getPageCount(outputFile.absolutePath)
+                                }
+
+                                val thumbnailPath = withContext(Dispatchers.IO) {
+                                    val firstPageBitmap = PdfEditor.renderPageToBitmap(context, outputFile.absolutePath, 0)
+                                    try {
+                                        firstPageBitmap?.let {
+                                            PdfGenerator.generateThumbnail(context, it, System.currentTimeMillis().toString())
+                                        }
+                                    } finally {
+                                        firstPageBitmap?.recycle()
+                                    }
+                                }
+
+                                val finalName = if (pdfName.endsWith(".pdf", ignoreCase = true)) pdfName else "$pdfName.pdf"
+                                val document = Document(
+                                    name = finalName,
+                                    pdfPath = outputFile.absolutePath,
+                                    thumbnailPath = thumbnailPath,
+                                    pageCount = importedPageCount,
+                                    size = outputFile.length()
+                                )
+
+                                withContext(Dispatchers.IO) {
+                                    repository.insertDocument(document)
+                                }
+
+                                Toast.makeText(context, "PDF imported to app documents!", Toast.LENGTH_SHORT).show()
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "Failed to import", Toast.LENGTH_SHORT).show()
                             }
-                            
-                            Toast.makeText(context, "PDF imported!", Toast.LENGTH_SHORT).show()
-                        } catch (e: Exception) {
-                            Toast.makeText(context, "Failed to import", Toast.LENGTH_SHORT).show()
                         }
                     }) {
                         Icon(Icons.Default.Download, contentDescription = "Import")
