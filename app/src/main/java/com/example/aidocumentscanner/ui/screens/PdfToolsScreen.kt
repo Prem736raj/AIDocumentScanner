@@ -45,6 +45,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
+private const val TEMP_DIR_ERROR_MESSAGE = "Cannot create temporary directory for PDF processing"
+private const val PDF_READ_ERROR_MESSAGE = "Cannot open PDF file. It may be corrupted or inaccessible."
+
 // Data class to represent external PDF files from file manager
 data class ExternalPdfFile(
     val uri: Uri,
@@ -294,14 +297,14 @@ fun PdfToolsScreen(
                                         selectedExternalPdf?.let { external ->
                                             val tempDir = File(context.cacheDir, "pdf")
                                             if (!tempDir.exists() && !tempDir.mkdirs()) {
-                                                Toast.makeText(context, "Cannot create temporary directory for PDF processing", Toast.LENGTH_LONG).show()
+                                                Toast.makeText(context, TEMP_DIR_ERROR_MESSAGE, Toast.LENGTH_LONG).show()
                                                 isProcessing = false
                                                 return@launch
                                             }
                                             val tempFile = File(tempDir, "temp_${System.currentTimeMillis()}.pdf")
                                             val inputStream = context.contentResolver.openInputStream(external.uri)
                                             if (inputStream == null) {
-                                                Toast.makeText(context, "Cannot open PDF file. It may be corrupted or inaccessible.", Toast.LENGTH_LONG).show()
+                                                Toast.makeText(context, PDF_READ_ERROR_MESSAGE, Toast.LENGTH_LONG).show()
                                                 isProcessing = false
                                                 return@launch
                                             }
@@ -503,7 +506,7 @@ fun PdfToolsScreen(
                                                 try {
                                                     val tempDir = File(context.cacheDir, "pdf")
                                                     if (!tempDir.exists() && !tempDir.mkdirs()) {
-                                                        Toast.makeText(context, "Cannot create temporary directory for PDF processing", Toast.LENGTH_LONG).show()
+                                                        Toast.makeText(context, TEMP_DIR_ERROR_MESSAGE, Toast.LENGTH_LONG).show()
                                                         return@forEach
                                                     }
                                                     val tempFile = File(tempDir, "ext_${System.currentTimeMillis()}_${external.name}")
