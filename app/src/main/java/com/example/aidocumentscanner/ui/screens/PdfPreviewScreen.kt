@@ -48,8 +48,8 @@ fun PdfPreviewScreen(
     var showNameDialog by remember { mutableStateOf(false) }
     var isSaving by remember { mutableStateOf(false) }
     var savingMessage by remember { mutableStateOf("Saving...") }
-    var selectedPageSize by remember { mutableStateOf(PdfGenerator.PageSizeType.A4) }
-    var selectedQuality by remember { mutableStateOf(PdfGenerator.QualityType.HIGH) }
+    var selectedPageSize by remember { mutableStateOf(getDefaultPageSizePreference(context)) }
+    var selectedQuality by remember { mutableStateOf(getDefaultQualityPreference(context)) }
     var showSettingsSheet by remember { mutableStateOf(false) }
     var estimatedSize by remember { mutableStateOf("") }
     
@@ -461,6 +461,23 @@ fun PdfPreviewScreen(
                 }
             }
         }
+    }
+}
+
+private fun getDefaultPageSizePreference(context: android.content.Context): PdfGenerator.PageSizeType {
+    return when (SettingsPreferences.getDefaultPageSize(context)) {
+        "Letter" -> PdfGenerator.PageSizeType.LETTER
+        "Legal" -> PdfGenerator.PageSizeType.LEGAL
+        "Fit to Image" -> PdfGenerator.PageSizeType.FIT_IMAGE
+        else -> PdfGenerator.PageSizeType.A4
+    }
+}
+
+private fun getDefaultQualityPreference(context: android.content.Context): PdfGenerator.QualityType {
+    return when (SettingsPreferences.getDefaultQuality(context)) {
+        "Standard" -> PdfGenerator.QualityType.STANDARD
+        "Ultra" -> PdfGenerator.QualityType.ULTRA
+        else -> PdfGenerator.QualityType.HIGH
     }
 }
 

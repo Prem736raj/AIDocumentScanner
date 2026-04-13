@@ -59,6 +59,11 @@ fun CameraScreen(
     var cameraProvider by remember { mutableStateOf<ProcessCameraProvider?>(null) }
     
     val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
+    DisposableEffect(Unit) {
+        onDispose {
+            cameraExecutor.shutdown()
+        }
+    }
     
     // Gallery picker launcher for multiple images
     val galleryLauncher = rememberLauncherForActivityResult(

@@ -44,6 +44,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.IOException
 
 // Data class to represent external PDF files from file manager
 data class ExternalPdfFile(
@@ -72,7 +73,7 @@ enum class PdfTool(
 @Composable
 fun PdfToolsScreen(
     onBack: () -> Unit,
-    onMergeComplete: (Long) -> Unit
+    onDocumentCreated: (Long) -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -292,7 +293,11 @@ fun PdfToolsScreen(
                                     val pdfPath = selectedDocument?.pdfPath ?: run {
                                         // Copy external PDF to temp file
                                         selectedExternalPdf?.let { external ->
-                                            val tempFile = File(context.cacheDir, "temp_${System.currentTimeMillis()}.pdf")
+                                            val tempDir = File(context.cacheDir, "pdf")
+                                            if (!tempDir.exists() && !tempDir.mkdirs()) {
+                                                throw IOException("Failed to create temp PDF directory")
+                                            }
+                                            val tempFile = File(tempDir, "temp_${System.currentTimeMillis()}.pdf")
                                             context.contentResolver.openInputStream(external.uri)?.use { input ->
                                                 tempFile.outputStream().use { output ->
                                                     input.copyTo(output)
@@ -417,7 +422,34 @@ fun PdfToolsScreen(
                                         PdfTool.ADD_WATERMARK -> showWatermarkDialog = true
                                         PdfTool.PASSWORD_PROTECT -> showPasswordDialog = true
                                         PdfTool.OPTIMIZE -> {
-                                            // Handle optimize
+                                            isProcessing = true
+                                            processingMessage = "Optimizing PDF..."
+                                            scope.launch {
+                                                val result = withContext(Dispatchers.IO) {
+                                                    PdfEditor.optimizePdf(context, doc.pdfPath, 60)
+                                                }
+
+                                                result.onSuccess { newPath ->
+                                                    val newDoc = Document(
+                                                        name = "${doc.name}_optimized",
+                                                        pdfPath = newPath,
+                                                        thumbnailPath = doc.thumbnailPath,
+                                                        pageCount = doc.pageCount,
+                                                        size = PdfGenerator.getFileSize(newPath)
+                                                    )
+                                                    val docId = repository.insertDocument(newDoc)
+                                                    Toast.makeText(context, "PDF optimized successfully!", Toast.LENGTH_SHORT).show()
+                                                    onDocumentCreated(docId)
+                                                }
+
+                                                result.onFailure { error ->
+                                                    Toast.makeText(context, "Error: ${error.message}", Toast.LENGTH_LONG).show()
+                                                }
+
+                                                isProcessing = false
+                                                selectedDocument = null
+                                                selectedTool = null
+                                            }
                                         }
                                         else -> {}
                                     }
@@ -460,7 +492,11 @@ fun PdfToolsScreen(
                                             // Copy external PDFs to temp files
                                             externalPdfs.forEach { external ->
                                                 try {
-                                                    val tempFile = File(context.cacheDir, "ext_${System.currentTimeMillis()}_${external.name}")
+                                                    val tempDir = File(context.cacheDir, "pdf")
+                                                    if (!tempDir.exists() && !tempDir.mkdirs()) {
+                                                        throw IOException("Failed to create temp PDF directory")
+                                                    }
+                                                    val tempFile = File(tempDir, "ext_${System.currentTimeMillis()}_${external.name}")
                                                     context.contentResolver.openInputStream(external.uri)?.use { input ->
                                                         tempFile.outputStream().use { output ->
                                                             input.copyTo(output)
@@ -493,7 +529,7 @@ fun PdfToolsScreen(
                                                 
                                                 withContext(Dispatchers.Main) {
                                                     Toast.makeText(context, "PDFs merged successfully!", Toast.LENGTH_SHORT).show()
-                                                    onMergeComplete(docId)
+                                                    onDocumentCreated(docId)
                                                 }
                                             }
                                             

@@ -47,7 +47,7 @@ fun EditorScreen(
     pages: List<Bitmap>,
     onAddMorePages: () -> Unit,
     onRemovePage: (Int) -> Unit,
-    onContinue: () -> Unit,
+    onContinue: (List<Bitmap>) -> Unit,
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
@@ -122,7 +122,7 @@ fun EditorScreen(
                     }
                     
                     TextButton(
-                        onClick = onContinue,
+                        onClick = { onContinue(processedPages.toList()) },
                         enabled = processedPages.isNotEmpty() && !isProcessing
                     ) {
                         Text("Continue", fontWeight = FontWeight.Bold)

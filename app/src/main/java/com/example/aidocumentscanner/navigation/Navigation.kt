@@ -26,8 +26,8 @@ sealed class Screen(val route: String) {
     object PdfPreview : Screen("pdf_preview")
     object Documents : Screen("documents")
     object Settings : Screen("settings")
-    object PdfViewer : Screen("pdf_viewer/{documentId}") {
-        fun createRoute(documentId: Long) = "pdf_viewer/$documentId"
+    object PdfViewer : Screen("pdf_viewer/{documentId}?page={page}") {
+        fun createRoute(documentId: Long, page: Int = 0) = "pdf_viewer/$documentId?page=$page"
     }
     object PdfTools : Screen("pdf_tools")
     object Search : Screen("search")
@@ -81,7 +81,8 @@ fun AppNavigation(
                         }
                     }
                 },
-                onDevicePdfsClick = { navController.navigate(Screen.DevicePdfs.route) }
+                onDevicePdfsClick = { navController.navigate(Screen.DevicePdfs.route) },
+                onOptimizeClick = { navController.navigate(Screen.PdfOptimizer.route) }
             )
         }
         
@@ -109,7 +110,9 @@ fun AppNavigation(
         ) {
             EditorScreen(
                 pages = pages,
-                onContinue = {
+                onContinue = { editedPages ->
+                    onClearPages()
+                    onAddPages(editedPages)
                     navController.navigate(Screen.PdfPreview.route) {
                         popUpTo(Screen.Editor.route) { inclusive = true }
                     }
@@ -155,11 +158,16 @@ fun AppNavigation(
         
         composable(
             route = Screen.PdfViewer.route,
-            arguments = listOf(navArgument("documentId") { type = NavType.LongType })
+            arguments = listOf(
+                navArgument("documentId") { type = NavType.LongType },
+                navArgument("page") { type = NavType.IntType; defaultValue = 0 }
+            )
         ) { backStackEntry ->
             val documentId = backStackEntry.arguments?.getLong("documentId") ?: 0L
+            val initialPage = backStackEntry.arguments?.getInt("page") ?: 0
             PdfViewerScreen(
                 documentId = documentId,
+                initialPage = initialPage,
                 onBack = { navController.popBackStack() }
             )
         }
@@ -167,7 +175,7 @@ fun AppNavigation(
         composable(Screen.PdfTools.route) {
             PdfToolsScreen(
                 onBack = { navController.popBackStack() },
-                onMergeComplete = { documentId ->
+                onDocumentCreated = { documentId ->
                     navController.navigate(Screen.PdfViewer.createRoute(documentId))
                 }
             )
@@ -177,9 +185,7 @@ fun AppNavigation(
             SearchScreen(
                 onBack = { navController.popBackStack() },
                 onResultClick = { documentId, pageNum ->
-                     // PDFViewer might not support pageNum yet, but we'll navigate to document
-                     // Ideally pass pageNum as param if supported
-                    navController.navigate(Screen.PdfViewer.createRoute(documentId))
+                    navController.navigate(Screen.PdfViewer.createRoute(documentId, pageNum))
                 }
             )
         }

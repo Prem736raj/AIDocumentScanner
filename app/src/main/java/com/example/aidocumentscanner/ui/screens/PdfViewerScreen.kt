@@ -42,6 +42,7 @@ import java.io.File
 @Composable
 fun PdfViewerScreen(
     documentId: Long,
+    initialPage: Int = 0,
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
@@ -50,7 +51,7 @@ fun PdfViewerScreen(
     var pages by remember { mutableStateOf<List<Bitmap>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var currentPage by remember { mutableIntStateOf(0) }
-    val listState = rememberLazyListState()
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialPage.coerceAtLeast(0))
     
     // Global zoom and pan state
     var scale by remember { mutableFloatStateOf(1f) }
@@ -74,7 +75,7 @@ fun PdfViewerScreen(
         snapshotFlow { listState.firstVisibleItemIndex }
             .collect { currentPage = it }
     }
-    
+
     Scaffold(
         topBar = {
             TopAppBar(
