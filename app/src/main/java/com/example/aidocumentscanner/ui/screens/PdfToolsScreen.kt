@@ -292,7 +292,8 @@ fun PdfToolsScreen(
                                     val pdfPath = selectedDocument?.pdfPath ?: run {
                                         // Copy external PDF to temp file
                                         selectedExternalPdf?.let { external ->
-                                            val tempFile = File(context.cacheDir, "temp_${System.currentTimeMillis()}.pdf")
+                                            val tempDir = File(context.cacheDir, "pdf").apply { mkdirs() }
+                                            val tempFile = File(tempDir, "temp_${System.currentTimeMillis()}.pdf")
                                             context.contentResolver.openInputStream(external.uri)?.use { input ->
                                                 tempFile.outputStream().use { output ->
                                                     input.copyTo(output)
@@ -487,7 +488,8 @@ fun PdfToolsScreen(
                                             // Copy external PDFs to temp files
                                             externalPdfs.forEach { external ->
                                                 try {
-                                                    val tempFile = File(context.cacheDir, "ext_${System.currentTimeMillis()}_${external.name}")
+                                                    val tempDir = File(context.cacheDir, "pdf").apply { mkdirs() }
+                                                    val tempFile = File(tempDir, "ext_${System.currentTimeMillis()}_${external.name}")
                                                     context.contentResolver.openInputStream(external.uri)?.use { input ->
                                                         tempFile.outputStream().use { output ->
                                                             input.copyTo(output)

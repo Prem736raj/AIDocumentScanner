@@ -245,7 +245,8 @@ private fun renderPdfPages(context: Context, pdfUri: Uri): List<Bitmap> {
     
     try {
         // For content:// URIs, we need to copy to a temp file first
-        val tempFile = File(context.cacheDir, "temp_pdf_${System.currentTimeMillis()}.pdf")
+        val tempDir = File(context.cacheDir, "pdf").apply { mkdirs() }
+        val tempFile = File(tempDir, "temp_pdf_${System.currentTimeMillis()}.pdf")
         
         context.contentResolver.openInputStream(pdfUri)?.use { input ->
             FileOutputStream(tempFile).use { output ->

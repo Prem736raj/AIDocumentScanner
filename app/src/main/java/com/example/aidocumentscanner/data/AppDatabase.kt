@@ -60,7 +60,6 @@ abstract class AppDatabase : RoomDatabase() {
                     "document_scanner_db"
                 )
                     .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
-                    .fallbackToDestructiveMigration()
                     .build()
                 INSTANCE = instance
                 instance
@@ -68,4 +67,3 @@ abstract class AppDatabase : RoomDatabase() {
         }
     }
 }
-
