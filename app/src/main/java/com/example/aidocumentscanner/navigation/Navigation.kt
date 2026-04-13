@@ -175,7 +175,7 @@ fun AppNavigation(
         composable(Screen.PdfTools.route) {
             PdfToolsScreen(
                 onBack = { navController.popBackStack() },
-                onMergeComplete = { documentId ->
+                onDocumentCreated = { documentId ->
                     navController.navigate(Screen.PdfViewer.createRoute(documentId))
                 }
             )

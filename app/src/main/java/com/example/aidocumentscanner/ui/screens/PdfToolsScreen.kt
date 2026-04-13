@@ -73,7 +73,7 @@ enum class PdfTool(
 @Composable
 fun PdfToolsScreen(
     onBack: () -> Unit,
-    onMergeComplete: (Long) -> Unit
+    onDocumentCreated: (Long) -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -439,7 +439,7 @@ fun PdfToolsScreen(
                                                     )
                                                     val docId = repository.insertDocument(newDoc)
                                                     Toast.makeText(context, "PDF optimized successfully!", Toast.LENGTH_SHORT).show()
-                                                    onMergeComplete(docId)
+                                                    onDocumentCreated(docId)
                                                 }
 
                                                 result.onFailure { error ->
@@ -529,7 +529,7 @@ fun PdfToolsScreen(
                                                 
                                                 withContext(Dispatchers.Main) {
                                                     Toast.makeText(context, "PDFs merged successfully!", Toast.LENGTH_SHORT).show()
-                                                    onMergeComplete(docId)
+                                                    onDocumentCreated(docId)
                                                 }
                                             }
                                             
