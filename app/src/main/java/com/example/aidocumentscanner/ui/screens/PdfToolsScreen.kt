@@ -186,6 +186,14 @@ fun PdfToolsScreen(
             selectedPages = emptySet()
         }
     }
+
+    LaunchedEffect(selectedDocument, selectedExternalPdf) {
+        if (selectedDocument == null && selectedExternalPdf == null) {
+            selectedPages = emptySet()
+            pageCount = 0
+            pageBitmaps = emptyList()
+        }
+    }
     
     Scaffold(
         topBar = {
@@ -499,6 +507,7 @@ fun PdfToolsScreen(
                                         scope.launch {
                                             // Prepare paths - including external PDFs
                                             val allPaths = mutableListOf<String>()
+                                            var failedExternalReads = 0
                                             
                                             // Add selected documents
                                             allPaths.addAll(selectedDocuments.map { it.pdfPath })
@@ -515,6 +524,7 @@ fun PdfToolsScreen(
                                                     val inputStream = context.contentResolver.openInputStream(external.uri)
                                                     if (inputStream == null) {
                                                         Toast.makeText(context, externalPdfReadErrorMessage(external.name), Toast.LENGTH_LONG).show()
+                                                        failedExternalReads++
                                                         return@forEach
                                                     }
                                                     inputStream.use { input ->
@@ -525,11 +535,19 @@ fun PdfToolsScreen(
                                                     allPaths.add(tempFile.absolutePath)
                                                 } catch (e: Exception) {
                                                     e.printStackTrace()
+                                                    failedExternalReads++
                                                 }
                                             }
                                             
                                             if (allPaths.size < 2) {
-                                                Toast.makeText(context, "Need at least 2 readable PDFs to merge", Toast.LENGTH_LONG).show()
+                                                val expectedPdfs = selectedDocuments.size + externalPdfs.size
+                                                val successPdfs = allPaths.size
+                                                val message = if (failedExternalReads > 0) {
+                                                    "Only $successPdfs of $expectedPdfs PDFs could be read. Need at least 2 readable PDFs."
+                                                } else {
+                                                    "Need at least 2 readable PDFs to merge"
+                                                }
+                                                Toast.makeText(context, message, Toast.LENGTH_LONG).show()
                                                 isProcessing = false
                                                 return@launch
                                             }
