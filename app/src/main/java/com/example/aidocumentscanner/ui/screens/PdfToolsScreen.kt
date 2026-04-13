@@ -44,7 +44,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.io.IOException
 
 // Data class to represent external PDF files from file manager
 data class ExternalPdfFile(
@@ -295,10 +294,18 @@ fun PdfToolsScreen(
                                         selectedExternalPdf?.let { external ->
                                             val tempDir = File(context.cacheDir, "pdf")
                                             if (!tempDir.exists() && !tempDir.mkdirs()) {
-                                                throw IOException("Failed to create temp PDF directory")
+                                                Toast.makeText(context, "Failed to access temporary storage", Toast.LENGTH_LONG).show()
+                                                isProcessing = false
+                                                return@launch
                                             }
                                             val tempFile = File(tempDir, "temp_${System.currentTimeMillis()}.pdf")
-                                            context.contentResolver.openInputStream(external.uri)?.use { input ->
+                                            val inputStream = context.contentResolver.openInputStream(external.uri)
+                                            if (inputStream == null) {
+                                                Toast.makeText(context, "Failed to read selected PDF", Toast.LENGTH_LONG).show()
+                                                isProcessing = false
+                                                return@launch
+                                            }
+                                            inputStream.use { input ->
                                                 tempFile.outputStream().use { output ->
                                                     input.copyTo(output)
                                                 }
@@ -384,6 +391,8 @@ fun PdfToolsScreen(
                                             }
                                             else -> {}
                                         }
+                                    } else {
+                                        Toast.makeText(context, "No PDF selected", Toast.LENGTH_LONG).show()
                                     }
                                     
                                     isProcessing = false
@@ -494,10 +503,16 @@ fun PdfToolsScreen(
                                                 try {
                                                     val tempDir = File(context.cacheDir, "pdf")
                                                     if (!tempDir.exists() && !tempDir.mkdirs()) {
-                                                        throw IOException("Failed to create temp PDF directory")
+                                                        Toast.makeText(context, "Failed to access temporary storage", Toast.LENGTH_LONG).show()
+                                                        return@forEach
                                                     }
                                                     val tempFile = File(tempDir, "ext_${System.currentTimeMillis()}_${external.name}")
-                                                    context.contentResolver.openInputStream(external.uri)?.use { input ->
+                                                    val inputStream = context.contentResolver.openInputStream(external.uri)
+                                                    if (inputStream == null) {
+                                                        Toast.makeText(context, "Failed to read ${external.name}", Toast.LENGTH_LONG).show()
+                                                        return@forEach
+                                                    }
+                                                    inputStream.use { input ->
                                                         tempFile.outputStream().use { output ->
                                                             input.copyTo(output)
                                                         }
@@ -508,6 +523,12 @@ fun PdfToolsScreen(
                                                 }
                                             }
                                             
+                                            if (allPaths.size < 2) {
+                                                Toast.makeText(context, "Need at least 2 readable PDFs to merge", Toast.LENGTH_LONG).show()
+                                                isProcessing = false
+                                                return@launch
+                                            }
+
                                             val result = withContext(Dispatchers.IO) {
                                                 PdfEditor.mergePdfs(
                                                     context,
