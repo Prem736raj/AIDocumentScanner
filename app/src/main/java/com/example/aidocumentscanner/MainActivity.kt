@@ -9,6 +9,7 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -18,11 +19,12 @@ import androidx.navigation.compose.rememberNavController
 import com.example.aidocumentscanner.navigation.AppNavigation
 import com.example.aidocumentscanner.ui.theme.AIDocumentScannerTheme
 import com.example.aidocumentscanner.ui.theme.ThemeMode
+import kotlinx.coroutines.flow.MutableStateFlow
 import org.opencv.android.OpenCVLoader
 
 class MainActivity : ComponentActivity() {
     
-    private var externalPdfUriState by mutableStateOf<Uri?>(null)
+    private val externalPdfUriState = MutableStateFlow<Uri?>(null)
 
     companion object {
         private const val TAG = "AIDocumentScanner"
@@ -43,7 +45,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         
         // Check if app was opened with a PDF file
-        externalPdfUriState = handlePdfIntent(intent)
+        externalPdfUriState.value = handlePdfIntent(intent)
         
         // Load saved theme preference
         val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -51,6 +53,7 @@ class MainActivity : ComponentActivity() {
         
         setContent {
             var themeMode by remember { mutableStateOf(ThemeMode.valueOf(savedThemeMode)) }
+            val externalPdfUri by externalPdfUriState.collectAsState()
             AIDocumentScannerTheme(themeMode = themeMode) {
                 val navController = rememberNavController()
                 
@@ -74,8 +77,8 @@ class MainActivity : ComponentActivity() {
                         // Save theme preference
                         prefs.edit().putString(KEY_THEME_MODE, newMode.name).apply()
                     },
-                    externalPdfUri = externalPdfUriState,
-                    onExternalPdfHandled = { externalPdfUriState = null }
+                    externalPdfUri = externalPdfUri,
+                    onExternalPdfHandled = { externalPdfUriState.value = null }
                 )
             }
         }
@@ -83,11 +86,12 @@ class MainActivity : ComponentActivity() {
     
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        // Keep Activity intent in sync so future getIntent() reads the latest deep-link/share intent.
         setIntent(intent)
         // Handle new PDF intent when app is already running
         handlePdfIntent(intent)?.let { uri ->
             Log.d(TAG, "Received new PDF intent: $uri")
-            externalPdfUriState = uri
+            externalPdfUriState.value = uri
         }
     }
     

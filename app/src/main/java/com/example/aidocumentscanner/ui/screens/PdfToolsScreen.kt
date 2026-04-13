@@ -192,9 +192,9 @@ fun PdfToolsScreen(
                             selectedTool?.label ?: "PDF Tools",
                             fontWeight = FontWeight.Bold
                         )
-                        if (selectedTool != null) {
+                        selectedTool?.let { tool ->
                             Text(
-                                selectedTool?.description.orEmpty(),
+                                tool.description,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
