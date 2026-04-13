@@ -37,6 +37,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
 
 private const val TAG = "PdfViewer"
 
@@ -245,7 +246,11 @@ private fun renderPdfPages(context: Context, pdfUri: Uri): List<Bitmap> {
     
     try {
         // For content:// URIs, we need to copy to a temp file first
-        val tempDir = File(context.cacheDir, "pdf").apply { mkdirs() }
+        val tempDir = File(context.cacheDir, "pdf").also {
+            if (!it.exists() && !it.mkdirs()) {
+                throw IOException("Failed to create temp PDF cache directory")
+            }
+        }
         val tempFile = File(tempDir, "temp_pdf_${System.currentTimeMillis()}.pdf")
         
         context.contentResolver.openInputStream(pdfUri)?.use { input ->

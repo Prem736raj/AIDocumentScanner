@@ -60,11 +60,6 @@ object StudentModeManager {
     suspend fun getCurrentSettings(context: Context): StudentModeSettings {
         return getSettings(context).first()
     }
-
-    @Deprecated("Use getCurrentSettings for suspend-based access")
-    suspend fun getSettingsSync(context: Context): StudentModeSettings {
-        return getCurrentSettings(context)
-    }
     
     /**
      * Update student mode enabled state

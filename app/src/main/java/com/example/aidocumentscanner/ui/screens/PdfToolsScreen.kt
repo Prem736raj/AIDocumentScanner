@@ -44,6 +44,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.IOException
 
 // Data class to represent external PDF files from file manager
 data class ExternalPdfFile(
@@ -293,6 +294,9 @@ fun PdfToolsScreen(
                                         // Copy external PDF to temp file
                                         selectedExternalPdf?.let { external ->
                                             val tempDir = File(context.cacheDir, "pdf").apply { mkdirs() }
+                                            if (!tempDir.exists() && !tempDir.mkdirs()) {
+                                                throw IOException("Failed to create temp PDF directory")
+                                            }
                                             val tempFile = File(tempDir, "temp_${System.currentTimeMillis()}.pdf")
                                             context.contentResolver.openInputStream(external.uri)?.use { input ->
                                                 tempFile.outputStream().use { output ->
@@ -489,6 +493,9 @@ fun PdfToolsScreen(
                                             externalPdfs.forEach { external ->
                                                 try {
                                                     val tempDir = File(context.cacheDir, "pdf").apply { mkdirs() }
+                                                    if (!tempDir.exists() && !tempDir.mkdirs()) {
+                                                        throw IOException("Failed to create temp PDF directory")
+                                                    }
                                                     val tempFile = File(tempDir, "ext_${System.currentTimeMillis()}_${external.name}")
                                                     context.contentResolver.openInputStream(external.uri)?.use { input ->
                                                         tempFile.outputStream().use { output ->
