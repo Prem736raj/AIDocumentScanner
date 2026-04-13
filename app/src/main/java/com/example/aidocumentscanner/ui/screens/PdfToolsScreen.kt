@@ -44,7 +44,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.io.IOException
+
+private const val TEMP_DIR_ERROR_MESSAGE = "Cannot create temporary directory for PDF processing"
+private const val PDF_READ_ERROR_MESSAGE = "Cannot open PDF file. It may be corrupted or inaccessible."
+private fun externalPdfReadErrorMessage(fileName: String) =
+    "Cannot open $fileName. The file may be corrupted or inaccessible."
 
 // Data class to represent external PDF files from file manager
 data class ExternalPdfFile(
@@ -182,6 +186,14 @@ fun PdfToolsScreen(
             selectedPages = emptySet()
         }
     }
+
+    LaunchedEffect(selectedDocument, selectedExternalPdf) {
+        if (selectedDocument == null && selectedExternalPdf == null) {
+            selectedPages = emptySet()
+            pageCount = 0
+            pageBitmaps = emptyList()
+        }
+    }
     
     Scaffold(
         topBar = {
@@ -189,12 +201,12 @@ fun PdfToolsScreen(
                 title = { 
                     Column {
                         Text(
-                            if (selectedTool != null) selectedTool!!.label else "PDF Tools",
+                            selectedTool?.label ?: "PDF Tools",
                             fontWeight = FontWeight.Bold
                         )
-                        if (selectedTool != null) {
+                        selectedTool?.let { tool ->
                             Text(
-                                selectedTool!!.description,
+                                tool.description,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -295,10 +307,18 @@ fun PdfToolsScreen(
                                         selectedExternalPdf?.let { external ->
                                             val tempDir = File(context.cacheDir, "pdf")
                                             if (!tempDir.exists() && !tempDir.mkdirs()) {
-                                                throw IOException("Failed to create temp PDF directory")
+                                                Toast.makeText(context, TEMP_DIR_ERROR_MESSAGE, Toast.LENGTH_LONG).show()
+                                                isProcessing = false
+                                                return@launch
                                             }
                                             val tempFile = File(tempDir, "temp_${System.currentTimeMillis()}.pdf")
-                                            context.contentResolver.openInputStream(external.uri)?.use { input ->
+                                            val inputStream = context.contentResolver.openInputStream(external.uri)
+                                            if (inputStream == null) {
+                                                Toast.makeText(context, PDF_READ_ERROR_MESSAGE, Toast.LENGTH_LONG).show()
+                                                isProcessing = false
+                                                return@launch
+                                            }
+                                            inputStream.use { input ->
                                                 tempFile.outputStream().use { output ->
                                                     input.copyTo(output)
                                                 }
@@ -384,6 +404,8 @@ fun PdfToolsScreen(
                                             }
                                             else -> {}
                                         }
+                                    } else {
+                                        Toast.makeText(context, "No PDF selected", Toast.LENGTH_LONG).show()
                                     }
                                     
                                     isProcessing = false
@@ -485,6 +507,7 @@ fun PdfToolsScreen(
                                         scope.launch {
                                             // Prepare paths - including external PDFs
                                             val allPaths = mutableListOf<String>()
+                                            var failedExternalReads = 0
                                             
                                             // Add selected documents
                                             allPaths.addAll(selectedDocuments.map { it.pdfPath })
@@ -494,10 +517,17 @@ fun PdfToolsScreen(
                                                 try {
                                                     val tempDir = File(context.cacheDir, "pdf")
                                                     if (!tempDir.exists() && !tempDir.mkdirs()) {
-                                                        throw IOException("Failed to create temp PDF directory")
+                                                        Toast.makeText(context, TEMP_DIR_ERROR_MESSAGE, Toast.LENGTH_LONG).show()
+                                                        return@forEach
                                                     }
                                                     val tempFile = File(tempDir, "ext_${System.currentTimeMillis()}_${external.name}")
-                                                    context.contentResolver.openInputStream(external.uri)?.use { input ->
+                                                    val inputStream = context.contentResolver.openInputStream(external.uri)
+                                                    if (inputStream == null) {
+                                                        Toast.makeText(context, externalPdfReadErrorMessage(external.name), Toast.LENGTH_LONG).show()
+                                                        failedExternalReads++
+                                                        return@forEach
+                                                    }
+                                                    inputStream.use { input ->
                                                         tempFile.outputStream().use { output ->
                                                             input.copyTo(output)
                                                         }
@@ -505,9 +535,23 @@ fun PdfToolsScreen(
                                                     allPaths.add(tempFile.absolutePath)
                                                 } catch (e: Exception) {
                                                     e.printStackTrace()
+                                                    failedExternalReads++
                                                 }
                                             }
                                             
+                                            if (allPaths.size < 2) {
+                                                val expectedPdfs = selectedDocuments.size + externalPdfs.size
+                                                val successPdfs = allPaths.size
+                                                val message = if (failedExternalReads > 0) {
+                                                    "Only $successPdfs of $expectedPdfs PDFs could be read. Need at least 2 readable PDFs."
+                                                } else {
+                                                    "Need at least 2 readable PDFs to merge"
+                                                }
+                                                Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                                                isProcessing = false
+                                                return@launch
+                                            }
+
                                             val result = withContext(Dispatchers.IO) {
                                                 PdfEditor.mergePdfs(
                                                     context,
@@ -599,6 +643,7 @@ fun PdfToolsScreen(
                     confirmButton = {
                         Button(
                             onClick = {
+                                val currentDocument = selectedDocument ?: return@Button
                                 if (watermarkText.isNotBlank()) {
                                     isProcessing = true
                                     processingMessage = "Adding watermark..."
@@ -606,15 +651,15 @@ fun PdfToolsScreen(
                                     
                                     scope.launch {
                                         val result = withContext(Dispatchers.IO) {
-                                            PdfEditor.addWatermark(context, selectedDocument!!.pdfPath, watermarkText)
+                                            PdfEditor.addWatermark(context, currentDocument.pdfPath, watermarkText)
                                         }
                                         
                                         result.onSuccess { newPath ->
                                             val newDoc = Document(
-                                                name = "${selectedDocument!!.name}_watermarked",
+                                                name = "${currentDocument.name}_watermarked",
                                                 pdfPath = newPath,
-                                                thumbnailPath = selectedDocument!!.thumbnailPath,
-                                                pageCount = selectedDocument!!.pageCount,
+                                                thumbnailPath = currentDocument.thumbnailPath,
+                                                pageCount = currentDocument.pageCount,
                                                 size = PdfGenerator.getFileSize(newPath)
                                             )
                                             repository.insertDocument(newDoc)
@@ -673,6 +718,7 @@ fun PdfToolsScreen(
                     confirmButton = {
                         Button(
                             onClick = {
+                                val currentDocument = selectedDocument ?: return@Button
                                 if (passwordText.isNotBlank()) {
                                     isProcessing = true
                                     processingMessage = "Encrypting PDF..."
@@ -680,15 +726,15 @@ fun PdfToolsScreen(
                                     
                                     scope.launch {
                                         val result = withContext(Dispatchers.IO) {
-                                            PdfEditor.passwordProtect(context, selectedDocument!!.pdfPath, passwordText)
+                                            PdfEditor.passwordProtect(context, currentDocument.pdfPath, passwordText)
                                         }
                                         
                                         result.onSuccess { newPath ->
                                             val newDoc = Document(
-                                                name = "${selectedDocument!!.name}_protected",
+                                                name = "${currentDocument.name}_protected",
                                                 pdfPath = newPath,
-                                                thumbnailPath = selectedDocument!!.thumbnailPath,
-                                                pageCount = selectedDocument!!.pageCount,
+                                                thumbnailPath = currentDocument.thumbnailPath,
+                                                pageCount = currentDocument.pageCount,
                                                 size = PdfGenerator.getFileSize(newPath)
                                             )
                                             repository.insertDocument(newDoc)
