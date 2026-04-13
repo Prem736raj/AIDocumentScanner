@@ -293,7 +293,7 @@ fun PdfToolsScreen(
                                     val pdfPath = selectedDocument?.pdfPath ?: run {
                                         // Copy external PDF to temp file
                                         selectedExternalPdf?.let { external ->
-                                            val tempDir = File(context.cacheDir, "pdf").apply { mkdirs() }
+                                            val tempDir = File(context.cacheDir, "pdf")
                                             if (!tempDir.exists() && !tempDir.mkdirs()) {
                                                 throw IOException("Failed to create temp PDF directory")
                                             }
@@ -492,7 +492,7 @@ fun PdfToolsScreen(
                                             // Copy external PDFs to temp files
                                             externalPdfs.forEach { external ->
                                                 try {
-                                                    val tempDir = File(context.cacheDir, "pdf").apply { mkdirs() }
+                                                    val tempDir = File(context.cacheDir, "pdf")
                                                     if (!tempDir.exists() && !tempDir.mkdirs()) {
                                                         throw IOException("Failed to create temp PDF directory")
                                                     }
