@@ -76,12 +76,6 @@ fun PdfViewerScreen(
             .collect { currentPage = it }
     }
 
-    LaunchedEffect(pages, initialPage) {
-        if (pages.isNotEmpty() && initialPage in pages.indices) {
-            listState.scrollToItem(initialPage)
-        }
-    }
-    
     Scaffold(
         topBar = {
             TopAppBar(
